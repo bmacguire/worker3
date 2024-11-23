@@ -14,7 +14,7 @@ const AXIS_NAMES = [AxisName.I, AxisName.J, AxisName.K];
 export class Camera {
   private position = new Vector(0, 0, 0);
 
-  private orientation = {
+  orientation = {
     [AxisName.I]: Vector.i,
     [AxisName.J]: Vector.j,
     [AxisName.K]: Vector.k,
