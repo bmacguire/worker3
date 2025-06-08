@@ -1,13 +1,15 @@
+import { Pixel } from "./pixel";
+
 export class Texture {
-  readonly pixels: [number, number, number, number][][];
+  readonly pixels: Pixel[][];
   readonly width: number;
   readonly height: number;
 
   constructor(imageData: ImageData) {
-    const rows: [number, number, number, number][][] = [];
+    const rows: Pixel[][] = [];
 
     for (let i = 0; i < imageData.height; i++) {
-      const row: [number, number, number, number][] = [];
+      const row: Pixel[] = [];
 
       for (let j = 0; j < imageData.width; j++) {
         const pi = (i * imageData.width + j) * 4;
@@ -28,24 +30,24 @@ export class Texture {
     this.width = imageData.width;
     this.height = imageData.height;
   }
-}
 
-export async function buildTexture(imageBlob: Blob) {
-  const image = new Image();
+  static async build(blob: Blob) {
+    const image = new Image();
 
-  return new Promise<Texture>((resolve, reject) => {
-    try {
+    return new Promise<Texture>((resolve) => {
       image.addEventListener("load", () => {
-        const canvas = new OffscreenCanvas(image.width, image.height);
-        const context = canvas.getContext("2d")!;
+        const context = new OffscreenCanvas(
+          image.width,
+          image.height
+        ).getContext("2d")!;
 
         context.drawImage(image, 0, 0);
 
         const imageData = context.getImageData(
           0,
           0,
-          canvas.width,
-          canvas.height
+          context.canvas.width,
+          context.canvas.height
         );
 
         URL.revokeObjectURL(image.src);
@@ -53,9 +55,7 @@ export async function buildTexture(imageBlob: Blob) {
         resolve(new Texture(imageData));
       });
 
-      image.src = URL.createObjectURL(imageBlob);
-    } catch (exception) {
-      reject(exception);
-    }
-  });
+      image.src = URL.createObjectURL(blob);
+    });
+  }
 }

@@ -13,57 +13,51 @@ export class Vector {
     this.w = w;
   }
 
-  static get i() {
-    return new Vector(1, 0, 0);
+  static i(k = 1) {
+    return new Vector(1, 0, 0).scale(k);
   }
 
-  static get j() {
-    return new Vector(0, 1, 0);
+  static j(k = 1) {
+    return new Vector(0, 1, 0).scale(k);
   }
 
-  static get k() {
-    return new Vector(0, 0, 1);
+  static k(k = 1) {
+    return new Vector(0, 0, 1).scale(k);
   }
 
-  sum(vector: Vector) {
-    return new Vector(this.x + vector.x, this.y + vector.y, this.z + vector.z);
+  add(v: Vector) {
+    return new Vector(this.x + v.x, this.y + v.y, this.z + v.z);
   }
 
-  sub(vector: Vector) {
-    return new Vector(this.x - vector.x, this.y - vector.y, this.z - vector.z);
+  sub(v: Vector) {
+    return new Vector(this.x - v.x, this.y - v.y, this.z - v.z);
   }
 
   scale(k: number) {
     return new Vector(this.x * k, this.y * k, this.z * k);
   }
 
-  dot(vector: Vector) {
-    return this.x * vector.x + this.y * vector.y + this.z * vector.z;
+  dot(v: Vector) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
   }
 
-  cross(vector: Vector) {
+  cross(v: Vector) {
     return new Vector(
-      this.y * vector.z - this.z * vector.y,
-      this.z * vector.x - this.x * vector.z,
-      this.x * vector.y - this.y * vector.x
+      this.y * v.z - this.z * v.y,
+      this.z * v.x - this.x * v.z,
+      this.x * v.y - this.y * v.x
     );
   }
 
-  transform(matrix: Matrix) {
+  transform(m: Matrix) {
     return new Vector(
-      new Vector(...matrix[0]).dot(this),
-      new Vector(...matrix[1]).dot(this),
-      new Vector(...matrix[2]).dot(this)
+      new Vector(...m[0]).dot(this),
+      new Vector(...m[1]).dot(this),
+      new Vector(...m[2]).dot(this)
     );
   }
 
-  unit() {
+  normalize() {
     return this.scale(1 / Math.hypot(this.x, this.y, this.z));
   }
-}
-
-export enum AxisName {
-  I = "i",
-  J = "j",
-  K = "k",
 }

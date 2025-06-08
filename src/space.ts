@@ -1,109 +1,82 @@
+import { Screen } from "./screen";
+import { Projector } from "./projector";
 import { Camera } from "./camera";
 import { Vector } from "./vector";
 import { Face } from "./face";
-import { clipMesh, Mesh, visibleMesh } from "./mesh";
+import { Mesh } from "./mesh";
 import { Plane } from "./plane";
+import { round } from "./math";
+
+type Planes = {
+  near: Plane;
+  far: Plane;
+  top: Plane;
+  bottom: Plane;
+  left: Plane;
+  right: Plane;
+};
 
 export class Space {
-  screenWidth: number;
-  screenHeight: number;
-  halfViewWidth: number;
-  halfViewHeight: number;
-  aspectRatio: number;
-  fov: number;
-  fovFactor: number;
-  zNear: number;
-  zFar: number;
-  zFactor: number;
-
-  nearXYPlane: Plane;
-  farXYPlane: Plane;
-  topXZPlane: Plane;
-  bottomXZPlane: Plane;
-  leftYZPlane: Plane;
-  rightYZPlane: Plane;
-
-  context: CanvasRenderingContext2D;
-  screenImageData: ImageData;
-  zBuffer: number[];
-
+  screen: Screen;
+  projector: Projector;
+  planes: Planes;
   camera = new Camera();
 
-  constructor(
-    canvas: HTMLCanvasElement,
-    fov: number,
-    zNear: number,
-    zFar: number
-  ) {
-    this.screenWidth = canvas.width;
-    this.screenHeight = canvas.height;
-    this.halfViewWidth = canvas.width * 0.5;
-    this.halfViewHeight = canvas.height * 0.5;
-    this.aspectRatio = canvas.height / canvas.width;
-    this.fov = fov;
-    this.fovFactor = 1 / Math.tan(fov * 0.5);
-    this.zNear = zNear;
-    this.zFar = zFar;
-    this.zFactor = zFar / (zFar - zNear);
-
-    this.nearXYPlane = {
-      position: new Vector(0, 0, zNear),
-      normal: Vector.k,
+  constructor(canvas: OffscreenCanvas, fov: number, near: number, far: number) {
+    this.screen = new Screen(canvas);
+    this.projector = new Projector(this.screen, fov, near, far);
+    this.planes = {
+      near: {
+        position: new Vector(0, 0, near),
+        normal: Vector.k(),
+      },
+      far: {
+        position: new Vector(0, 0, far),
+        normal: Vector.k(-1),
+      },
+      top: {
+        position: new Vector(1, 1, 0),
+        normal: Vector.j(),
+      },
+      bottom: {
+        position: new Vector(this.screen.width - 2, this.screen.height - 2, 0),
+        normal: Vector.j(-1),
+      },
+      left: {
+        position: new Vector(1, 1, 0),
+        normal: Vector.i(),
+      },
+      right: {
+        position: new Vector(this.screen.width - 2, this.screen.height - 2, 0),
+        normal: Vector.i(-1),
+      },
     };
-
-    this.farXYPlane = {
-      position: new Vector(0, 0, zFar),
-      normal: Vector.k.scale(-1),
-    };
-
-    this.topXZPlane = {
-      position: new Vector(1, 1, 0),
-      normal: Vector.j,
-    };
-
-    this.bottomXZPlane = {
-      position: new Vector(canvas.width - 2, canvas.height - 2, 0),
-      normal: Vector.j.scale(-1),
-    };
-
-    this.leftYZPlane = {
-      position: new Vector(1, 1, 0),
-      normal: Vector.i,
-    };
-
-    this.rightYZPlane = {
-      position: new Vector(canvas.width - 2, canvas.height - 2, 0),
-      normal: Vector.i.scale(-1),
-    };
-
-    this.context = canvas.getContext("2d")!;
-    this.screenImageData = new ImageData(canvas.width, canvas.height);
-    this.zBuffer = new Array(canvas.width * canvas.height).fill(0);
   }
 
-  clear() {
-    for (let i = 0; i < this.screenImageData.data.length; i += 4) {
-      this.screenImageData.data[i] = 0;
-      this.screenImageData.data[i + 1] = 0;
-      this.screenImageData.data[i + 2] = 0;
-      this.screenImageData.data[i + 3] = 255;
-    }
+  transform(mesh: Mesh) {
+    const gfaces = mesh.gfaces.map((gf) => {
+      return new Face(
+        this.camera.transform(gf.vertices[0]),
+        this.camera.transform(gf.vertices[1]),
+        this.camera.transform(gf.vertices[2])
+      );
+    });
 
-    this.zBuffer = new Array(this.screenWidth * this.screenHeight).fill(0);
+    return new Mesh(gfaces, mesh.tfaces, mesh.texture);
   }
 
-  fillScreenImageData(mesh: Mesh) {
-    for (let fi = 0; fi < mesh.faces.length; fi++) {
-      const f = mesh.faces[fi];
+  rasterize(mesh: Mesh) {
+    for (let fi = 0; fi < mesh.gfaces.length; fi++) {
+      const gf = mesh.gfaces[fi];
       const tf = mesh.tfaces[fi];
 
       let [[x1, y1, u1, v1, w1], [x2, y2, u2, v2, w2], [x3, y3, u3, v3, w3]] =
-        f.vertices
-          .map((v, vi) => [v, vi] as [Vector, number])
-          .sort(([v1], [v2]) => v1.y - v2.y)
-          .map(([v, vi]) => [
-            Math.round(v.x),
-            Math.round(v.y),
+        gf.vertices
+          .map((gv, vi) => [gv, vi] as [Vector, number])
+          .sort(([gv1], [gv2]) => gv1.y - gv2.y)
+          .map(([gv, vi]) => [
+            round(gv.x),
+            round(gv.y),
             tf.vertices[vi].x,
             tf.vertices[vi].y,
             tf.vertices[vi].z,
@@ -153,16 +126,18 @@ export class Space {
 
       if (dy1) {
         for (let i = y1; i <= y2; i++) {
-          let ax = Math.round(x1 + (i - y1) * daxStep);
-          let bx = Math.round(x1 + (i - y1) * dbxStep);
+          const di = i - y1;
 
-          let tex_su = u1 + (i - y1) * du1_step;
-          let tex_sv = v1 + (i - y1) * dv1_step;
-          let tex_sw = w1 + (i - y1) * dw1_step;
+          let ax = round(x1 + di * daxStep);
+          let bx = round(x1 + di * dbxStep);
 
-          let tex_eu = u1 + (i - y1) * du2_step;
-          let tex_ev = v1 + (i - y1) * dv2_step;
-          let tex_ew = w1 + (i - y1) * dw2_step;
+          let tex_su = u1 + di * du1_step;
+          let tex_sv = v1 + di * dv1_step;
+          let tex_sw = w1 + di * dw1_step;
+
+          let tex_eu = u1 + di * du2_step;
+          let tex_ev = v1 + di * dv2_step;
+          let tex_ew = w1 + di * dw2_step;
 
           if (ax > bx) {
             [ax, bx] = [bx, ax];
@@ -179,27 +154,21 @@ export class Space {
           let t = 0;
 
           for (let j = ax; j <= bx; j++) {
-            const zbi = i * this.screenImageData.width + j;
+            const depthIndex = i * this.screen.width + j;
+            const depth = this.screen.getPixelDepth(depthIndex);
 
-            tex_w = (1 - t) * tex_sw + t * tex_ew;
+            tex_w = tex_sw + (tex_ew - tex_sw) * t;
 
-            if (tex_w > this.zBuffer[zbi]) {
-              tex_u = (1 - t) * tex_su + t * tex_eu;
-              tex_v = (1 - t) * tex_sv + t * tex_ev;
+            if (tex_w > depth) {
+              tex_u = tex_su + (tex_eu - tex_su) * t;
+              tex_v = tex_sv + (tex_ev - tex_sv) * t;
 
-              const u = Math.round((tex_u * (mesh.texture.width - 1)) / tex_w);
-              const v = Math.round((tex_v * (mesh.texture.height - 1)) / tex_w);
+              const u = round((tex_u * (mesh.texture.width - 1)) / tex_w);
+              const v = round((tex_v * (mesh.texture.height - 1)) / tex_w);
 
               const pixel = mesh.texture.pixels[v][u];
 
-              const si = zbi * 4;
-
-              this.screenImageData.data[si] = pixel[0];
-              this.screenImageData.data[si + 1] = pixel[1];
-              this.screenImageData.data[si + 2] = pixel[2];
-              this.screenImageData.data[si + 3] = pixel[3];
-
-              this.zBuffer[zbi] = tex_w;
+              this.screen.setPixel(pixel, depthIndex, tex_w);
             }
 
             t += tstep;
@@ -230,16 +199,19 @@ export class Space {
 
       if (dy1) {
         for (let i = y2; i <= y3; i++) {
-          let ax = Math.round(x2 + (i - y2) * daxStep);
-          let bx = Math.round(x1 + (i - y1) * dbxStep);
+          const di2 = i - y2;
+          const di1 = i - y1;
 
-          let tex_su = u2 + (i - y2) * du1_step;
-          let tex_sv = v2 + (i - y2) * dv1_step;
-          let tex_sw = w2 + (i - y2) * dw1_step;
+          let ax = round(x2 + di2 * daxStep);
+          let bx = round(x1 + di1 * dbxStep);
 
-          let tex_eu = u1 + (i - y1) * du2_step;
-          let tex_ev = v1 + (i - y1) * dv2_step;
-          let tex_ew = w1 + (i - y1) * dw2_step;
+          let tex_su = u2 + di2 * du1_step;
+          let tex_sv = v2 + di2 * dv1_step;
+          let tex_sw = w2 + di2 * dw1_step;
+
+          let tex_eu = u1 + di1 * du2_step;
+          let tex_ev = v1 + di1 * dv2_step;
+          let tex_ew = w1 + di1 * dw2_step;
 
           if (ax > bx) {
             [ax, bx] = [bx, ax];
@@ -256,27 +228,21 @@ export class Space {
           let t = 0;
 
           for (let j = ax; j <= bx; j++) {
-            const zbi = i * this.screenImageData.width + j;
+            const depthIndex = i * this.screen.width + j;
+            const depth = this.screen.getPixelDepth(depthIndex);
 
-            tex_w = (1 - t) * tex_sw + t * tex_ew;
+            tex_w = tex_sw + (tex_ew - tex_sw) * t;
 
-            if (tex_w > this.zBuffer[zbi]) {
-              tex_u = (1 - t) * tex_su + t * tex_eu;
-              tex_v = (1 - t) * tex_sv + t * tex_ev;
+            if (tex_w > depth) {
+              tex_u = tex_su + (tex_eu - tex_su) * t;
+              tex_v = tex_sv + (tex_ev - tex_sv) * t;
 
-              const u = Math.round((tex_u * (mesh.texture.width - 1)) / tex_w);
-              const v = Math.round((tex_v * (mesh.texture.height - 1)) / tex_w);
+              const u = round((tex_u * (mesh.texture.width - 1)) / tex_w);
+              const v = round((tex_v * (mesh.texture.height - 1)) / tex_w);
 
               const pixel = mesh.texture.pixels[v][u];
 
-              const si = zbi * 4;
-
-              this.screenImageData.data[si] = pixel[0];
-              this.screenImageData.data[si + 1] = pixel[1];
-              this.screenImageData.data[si + 2] = pixel[2];
-              this.screenImageData.data[si + 3] = pixel[3];
-
-              this.zBuffer[zbi] = tex_w;
+              this.screen.setPixel(pixel, depthIndex, tex_w);
             }
 
             t += tstep;
@@ -286,67 +252,24 @@ export class Space {
     }
   }
 
-  render(mesh: Mesh) {
-    const transformedFaces = mesh.faces.map((f) => {
-      return new Face(
-        this.camera.transform(f.vertices[0]),
-        this.camera.transform(f.vertices[1]),
-        this.camera.transform(f.vertices[2])
-      );
-    });
+  render(...meshes: Mesh[]) {
+    this.screen.clearPixels();
 
-    let rmesh = new Mesh(transformedFaces, mesh.tfaces, mesh.texture);
+    for (const mesh of meshes) {
+      let m = this.transform(mesh);
 
-    rmesh = visibleMesh(rmesh);
+      m = m.asVisible().clip(this.planes.near).clip(this.planes.far);
 
-    rmesh = clipMesh(rmesh, this.nearXYPlane);
-    rmesh = clipMesh(rmesh, this.farXYPlane);
+      m = this.projector
+        .project(m)
+        .clip(this.planes.top)
+        .clip(this.planes.bottom)
+        .clip(this.planes.left)
+        .clip(this.planes.right);
 
-    const projectedFaces: Face[] = [];
-    const projectedTFaces: Face[] = [];
-
-    for (let fi = 0; fi < rmesh.faces.length; fi++) {
-      const f = rmesh.faces[fi];
-      const tf = rmesh.tfaces[fi];
-
-      const vs = new Array<Vector>(3);
-      const tvs = new Array<Vector>(3);
-
-      for (let i = 0; i < 3; i++) {
-        vs[i] = new Vector(
-          (f.vertices[i].x *
-            this.aspectRatio *
-            this.fovFactor *
-            this.halfViewWidth) /
-            f.vertices[i].z +
-            this.halfViewWidth,
-          (f.vertices[i].y * this.fovFactor * this.halfViewHeight) /
-            f.vertices[i].z +
-            this.halfViewHeight,
-          (this.zFactor * (f.vertices[i].z - this.zNear)) / f.vertices[i].z,
-          f.vertices[i].z
-        );
-
-        tvs[i] = new Vector(
-          tf.vertices[i].x / f.vertices[i].z,
-          tf.vertices[i].y / f.vertices[i].z,
-          1 / f.vertices[i].z
-        );
-      }
-
-      projectedFaces.push(new Face(vs[0], vs[1], vs[2], f.normal));
-      projectedTFaces.push(new Face(tvs[0], tvs[1], tvs[2]));
+      this.rasterize(m);
     }
 
-    rmesh = new Mesh(projectedFaces, projectedTFaces, mesh.texture);
-
-    rmesh = clipMesh(rmesh, this.topXZPlane);
-    rmesh = clipMesh(rmesh, this.bottomXZPlane);
-    rmesh = clipMesh(rmesh, this.leftYZPlane);
-    rmesh = clipMesh(rmesh, this.rightYZPlane);
-
-    this.fillScreenImageData(rmesh);
-
-    this.context.putImageData(this.screenImageData, 0, 0);
+    this.screen.renderPixels();
   }
 }

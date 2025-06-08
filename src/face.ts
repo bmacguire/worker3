@@ -4,13 +4,8 @@ export class Face {
   vertices: [Vector, Vector, Vector];
   private _normal: Vector | undefined;
 
-  constructor(
-    vertex1: Vector,
-    vertex2: Vector,
-    vertex3: Vector,
-    normal?: Vector
-  ) {
-    this.vertices = [vertex1, vertex2, vertex3];
+  constructor(v1: Vector, v2: Vector, v3: Vector, normal?: Vector) {
+    this.vertices = [v1, v2, v3];
     this._normal = normal;
   }
 
@@ -24,7 +19,7 @@ export class Face {
     return this._normal;
   }
 
-  get isVisible() {
+  get visible() {
     return this.normal.dot(this.vertices[0]) < 0;
   }
 }

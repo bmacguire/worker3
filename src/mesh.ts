@@ -4,25 +4,23 @@ import { Texture } from "./texture";
 import { Plane } from "./plane";
 
 export class Mesh {
-  faces: Face[];
+  gfaces: Face[];
   tfaces: Face[];
   texture: Texture;
 
-  constructor(faces: Face[], tfaces: Face[], texture: Texture) {
-    this.faces = faces;
+  constructor(gfaces: Face[], tfaces: Face[], texture: Texture) {
+    this.gfaces = gfaces;
     this.tfaces = tfaces;
     this.texture = texture;
   }
-}
 
-export async function buildMesh(objBlob: Blob, texture: Texture) {
-  try {
-    const vertices: Vector[] = [];
+  static async build(obj: Blob, texture: Texture) {
+    const gvertices: Vector[] = [];
     const tvertices: Vector[] = [];
-    const faces: Face[] = [];
+    const gfaces: Face[] = [];
     const tfaces: Face[] = [];
 
-    const content = await objBlob.text();
+    const content = await obj.text();
     const lines = content.split(/\r?\n/gm);
 
     for (const line of lines) {
@@ -44,7 +42,7 @@ export async function buildMesh(objBlob: Blob, texture: Texture) {
           continue;
         }
 
-        vertices.push(new Vector(numbers[0], numbers[1], numbers[2]));
+        gvertices.push(new Vector(numbers[0], numbers[1], numbers[2]));
 
         continue;
       }
@@ -65,20 +63,20 @@ export async function buildMesh(objBlob: Blob, texture: Texture) {
         continue;
       }
 
-      const [vi0, tvi0] = parts[0].split("/").map((x) => parseInt(x.trim()));
-      const [vi1, tvi1] = parts[1].split("/").map((x) => parseInt(x.trim()));
-      const [vi2, tvi2] = parts[2].split("/").map((x) => parseInt(x.trim()));
+      const [gvi0, tvi0] = parts[0].split("/").map((x) => parseInt(x.trim()));
+      const [gvi1, tvi1] = parts[1].split("/").map((x) => parseInt(x.trim()));
+      const [gvi2, tvi2] = parts[2].split("/").map((x) => parseInt(x.trim()));
 
-      const faceHasError = [vi0, vi1, vi2].some((vi) => {
-        return !vertices[vi - 1];
+      const gfaceHasError = [gvi0, gvi1, gvi2].some((gvi) => {
+        return !gvertices[gvi - 1];
       });
 
-      if (faceHasError) {
+      if (gfaceHasError) {
         continue;
       }
 
-      faces.push(
-        new Face(vertices[vi0 - 1], vertices[vi1 - 1], vertices[vi2 - 1])
+      gfaces.push(
+        new Face(gvertices[gvi0 - 1], gvertices[gvi1 - 1], gvertices[gvi2 - 1])
       );
 
       const tfaceHasError = [tvi0, tvi1, tvi2].some((tvi) => {
@@ -94,98 +92,115 @@ export async function buildMesh(objBlob: Blob, texture: Texture) {
       );
     }
 
-    // if (faces.length !== tfaces.length || faces.length === 0) {
-    //   throw Error("Invalid OBJ file");
-    // }
-
-    return new Mesh(faces, tfaces, texture);
-  } catch (exception) {
-    throw exception;
-  }
-}
-
-export function visibleMesh(mesh: Mesh) {
-  const faces: Face[] = [];
-  const tfaces: Face[] = [];
-
-  for (let fi = 0; fi < mesh.faces.length; fi++) {
-    const f = mesh.faces[fi];
-    const tf = mesh.tfaces[fi];
-
-    if (f.isVisible) {
-      faces.push(f);
-      tfaces.push(tf);
+    if (tfaces.length === 0) {
+      tfaces.push(
+        ...gfaces.map(
+          () =>
+            new Face(
+              new Vector(0, 0, 0),
+              new Vector(0, 1, 0),
+              new Vector(1, 1, 0)
+            )
+        )
+      );
     }
+
+    if (gfaces.length !== tfaces.length || gfaces.length === 0) {
+      throw Error("Invalid OBJ file");
+    }
+
+    return new Mesh(gfaces, tfaces, texture);
   }
 
-  return new Mesh(faces, tfaces, mesh.texture);
-}
+  asVisible() {
+    const gfaces: Face[] = [];
+    const tfaces: Face[] = [];
 
-export function clipMesh(mesh: Mesh, plane: Plane) {
-  const faces: Face[] = [];
-  const tfaces: Face[] = [];
+    for (let fi = 0; fi < this.gfaces.length; fi++) {
+      const gf = this.gfaces[fi];
+      const tf = this.tfaces[fi];
 
-  for (let fi = 0; fi < mesh.faces.length; fi++) {
-    const f = mesh.faces[fi];
-    const tf = mesh.tfaces[fi];
-
-    const distances = f.vertices.map((v) => {
-      return v.sub(plane.position).dot(plane.normal);
-    });
-
-    if (distances.every((d) => d <= 0)) {
-      continue;
+      if (gf.visible) {
+        gfaces.push(gf);
+        tfaces.push(tf);
+      }
     }
 
-    if (distances.every((d) => d >= 0)) {
-      faces.push(f);
-      tfaces.push(tf);
-
-      continue;
-    }
-
-    const insideIndices = distances
-      .map((d, di) => (d > 0 ? di : undefined))
-      .filter((di) => di !== undefined);
-
-    const di0 =
-      insideIndices.length === 1
-        ? insideIndices[0]
-        : distances.findIndex((d) => d < 0);
-
-    const di1 = (di0 + 1) % 3;
-    const di2 = (di0 + 2) % 3;
-
-    const v0 = f.vertices[di0];
-    const v1 = f.vertices[di1];
-    const v2 = f.vertices[di2];
-
-    const tv0 = tf.vertices[di0];
-    const tv1 = tf.vertices[di1];
-    const tv2 = tf.vertices[di2];
-
-    const t0 =
-      plane.position.sub(v0).dot(plane.normal) / v1.sub(v0).dot(plane.normal);
-
-    const t1 =
-      plane.position.sub(v2).dot(plane.normal) / v0.sub(v2).dot(plane.normal);
-
-    const q0 = v0.scale(1 - t0).sum(v1.scale(t0));
-    const q1 = v2.scale(1 - t1).sum(v0.scale(t1));
-
-    const tq0 = tv0.scale(1 - t0).sum(tv1.scale(t0));
-    const tq1 = tv2.scale(1 - t1).sum(tv0.scale(t1));
-
-    if (insideIndices.length === 1) {
-      faces.push(new Face(v0, q0, q1, f.normal));
-      tfaces.push(new Face(tv0, tq0, tq1));
-
-      continue;
-    }
-
-    faces.push(new Face(v1, v2, q1, f.normal), new Face(q1, q0, v1, f.normal));
-    tfaces.push(new Face(tv1, tv2, tq1), new Face(tq1, tq0, tv1));
+    return new Mesh(gfaces, tfaces, this.texture);
   }
 
-  return new Mesh(faces, tfaces, mesh.texture);
+  clip(plane: Plane) {
+    const gfaces: Face[] = [];
+    const tfaces: Face[] = [];
+
+    for (let fi = 0; fi < this.gfaces.length; fi++) {
+      const gf = this.gfaces[fi];
+      const tf = this.tfaces[fi];
+
+      const distances = gf.vertices.map((v) => {
+        return v.sub(plane.position).dot(plane.normal);
+      });
+
+      if (distances.every((d) => d <= 0)) {
+        continue;
+      }
+
+      if (distances.every((d) => d >= 0)) {
+        gfaces.push(gf);
+        tfaces.push(tf);
+
+        continue;
+      }
+
+      const insideIndices = distances
+        .map((d, di) => (d > 0 ? di : undefined))
+        .filter((di) => di !== undefined);
+
+      const di0 =
+        insideIndices.length === 1
+          ? insideIndices[0]
+          : distances.findIndex((d) => d < 0);
+
+      const di1 = (di0 + 1) % 3;
+      const di2 = (di0 + 2) % 3;
+
+      const gv0 = gf.vertices[di0];
+      const gv1 = gf.vertices[di1];
+      const gv2 = gf.vertices[di2];
+
+      const tv0 = tf.vertices[di0];
+      const tv1 = tf.vertices[di1];
+      const tv2 = tf.vertices[di2];
+
+      const t0 =
+        plane.position.sub(gv0).dot(plane.normal) /
+        gv1.sub(gv0).dot(plane.normal);
+
+      const t1 =
+        plane.position.sub(gv2).dot(plane.normal) /
+        gv0.sub(gv2).dot(plane.normal);
+
+      const gq0 = gv0.scale(1 - t0).add(gv1.scale(t0));
+      const gq1 = gv2.scale(1 - t1).add(gv0.scale(t1));
+
+      const tq0 = tv0.scale(1 - t0).add(tv1.scale(t0));
+      const tq1 = tv2.scale(1 - t1).add(tv0.scale(t1));
+
+      if (insideIndices.length === 1) {
+        gfaces.push(new Face(gv0, gq0, gq1, gf.normal));
+        tfaces.push(new Face(tv0, tq0, tq1));
+
+        continue;
+      }
+
+      gfaces.push(
+        new Face(gv1, gv2, gq1, gf.normal),
+        new Face(gq1, gq0, gv1, gf.normal)
+      );
+
+      tfaces.push(new Face(tv1, tv2, tq1), new Face(tq1, tq0, tv1));
+    }
+
+    return new Mesh(gfaces, tfaces, this.texture);
+  }
 }

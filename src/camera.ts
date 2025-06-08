@@ -1,56 +1,54 @@
-import { Vector, AxisName } from "./vector";
+import { Vector } from "./vector";
 import {
   Matrix,
   buildRotation,
   multiplyMatrices,
   transposeMatrix,
 } from "./matrix";
-import { Controller, MotionType } from "./controller";
+import { Controller } from "./controller";
 
 const TRANSLATION_SPEED = 0.03;
 const ROTATION_SPEED = Math.PI / 512;
-const AXIS_NAMES = [AxisName.I, AxisName.J, AxisName.K];
+const BASIS = ["i", "j", "k"] as const;
 
 export class Camera {
-  private position = new Vector(0, 0, 0);
+  position = new Vector(0, 0, 0);
 
   orientation = {
-    [AxisName.I]: Vector.i,
-    [AxisName.J]: Vector.j,
-    [AxisName.K]: Vector.k,
+    i: Vector.i(),
+    j: Vector.j(),
+    k: Vector.k(),
   };
 
-  private rotation: Matrix = [
+  rotation: Matrix = [
     [1, 0, 0],
     [0, 1, 0],
     [0, 0, 1],
   ];
 
-  private readonly controller = new Controller();
+  controller = new Controller();
 
   update() {
     const motions = this.controller.getMotions();
 
     const rotations = motions
-      .filter((motion) => motion.type === MotionType.Rotation)
+      .filter((motion) => motion.type === "R")
       .map((motion) => {
         const rotation = buildRotation(
-          this.orientation[motion.axisName],
+          this.orientation[motion.axis],
           motion.sign * ROTATION_SPEED
         );
 
-        const i0 = AXIS_NAMES.findIndex(
-          (axisName) => axisName === motion.axisName
-        );
+        const i0 = BASIS.findIndex((axis) => axis === motion.axis);
         const i1 = (i0 + 1) % 3;
         const i2 = (i0 + 2) % 3;
 
-        this.orientation[AXIS_NAMES[i1]] =
-          this.orientation[AXIS_NAMES[i1]].transform(rotation);
+        this.orientation[BASIS[i1]] =
+          this.orientation[BASIS[i1]].transform(rotation);
 
-        this.orientation[AXIS_NAMES[i2]] = this.orientation[
-          AXIS_NAMES[i0]
-        ].cross(this.orientation[AXIS_NAMES[i1]]);
+        this.orientation[BASIS[i2]] = this.orientation[BASIS[i0]].cross(
+          this.orientation[BASIS[i1]]
+        );
 
         return rotation;
       });
@@ -58,17 +56,15 @@ export class Camera {
     this.rotation = multiplyMatrices(...rotations, this.rotation);
 
     motions
-      .filter((motion) => motion.type === MotionType.Translation)
+      .filter((motion) => motion.type === "T")
       .forEach((motion) => {
-        this.position = this.position.sum(
-          this.orientation[motion.axisName].scale(
-            motion.sign * TRANSLATION_SPEED
-          )
+        this.position = this.position.add(
+          this.orientation[motion.axis].scale(motion.sign * TRANSLATION_SPEED)
         );
       });
   }
 
-  transform(vector: Vector) {
-    return vector.sub(this.position).transform(transposeMatrix(this.rotation));
+  transform(v: Vector) {
+    return v.sub(this.position).transform(transposeMatrix(this.rotation));
   }
 }

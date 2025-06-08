@@ -1,4 +1,5 @@
 import { Vector } from "./vector";
+import { cos, sin } from "./math";
 
 export type Matrix = [
   [number, number, number],
@@ -6,30 +7,24 @@ export type Matrix = [
   [number, number, number]
 ];
 
-export function buildRotation(unitVector: Vector, angle: number): Matrix {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  const cf = 1 - c;
-  const xy = unitVector.x * unitVector.y;
-  const xz = unitVector.x * unitVector.z;
-  const yz = unitVector.y * unitVector.z;
+export function buildRotation(u: Vector, angle: number): Matrix {
+  const c = cos(angle);
+  const s = sin(angle);
+
+  const cc = 1 - c;
+
+  const xycc = u.x * u.y * cc;
+  const xzcc = u.x * u.z * cc;
+  const yzcc = u.y * u.z * cc;
+
+  const zs = u.z * s;
+  const ys = u.y * s;
+  const xs = u.x * s;
 
   return [
-    [
-      c + unitVector.x * unitVector.x * cf,
-      xy * cf - unitVector.z * s,
-      xz * cf + unitVector.y * s,
-    ],
-    [
-      xy * cf + unitVector.z * s,
-      c + unitVector.y * unitVector.y * cf,
-      yz * cf - unitVector.x * s,
-    ],
-    [
-      xz * cf - unitVector.y * s,
-      yz * cf + unitVector.x * s,
-      c + unitVector.z * unitVector.z * cf,
-    ],
+    [c + u.x * u.x * cc, xycc - zs, xzcc + ys],
+    [xycc + zs, c + u.y * u.y * cc, yzcc - xs],
+    [xzcc - ys, yzcc + xs, c + u.z * u.z * cc],
   ];
 }
 
