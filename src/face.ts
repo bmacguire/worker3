@@ -2,24 +2,23 @@ import { Vector } from "./vector";
 
 export class Face {
   vertices: [Vector, Vector, Vector];
-  private _normal: Vector | undefined;
+  _visibility: number | undefined;
 
-  constructor(v1: Vector, v2: Vector, v3: Vector, normal?: Vector) {
+  constructor(v1: Vector, v2: Vector, v3: Vector, visibility?: number) {
     this.vertices = [v1, v2, v3];
-    this._normal = normal;
+    this._visibility = visibility;
   }
 
-  get normal() {
-    if (!this._normal) {
-      this._normal = this.vertices[1]
+  get visibility() {
+    if (this._visibility === undefined) {
+      const normal = this.vertices[1]
         .sub(this.vertices[0])
         .cross(this.vertices[2].sub(this.vertices[0]));
+
+      this._visibility =
+        -255 * normal.normalize().dot(this.vertices[0].normalize());
     }
 
-    return this._normal;
-  }
-
-  get visible() {
-    return this.normal.dot(this.vertices[0]) < 0;
+    return this._visibility;
   }
 }

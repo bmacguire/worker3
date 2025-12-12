@@ -120,7 +120,7 @@ export class Mesh {
       const gf = this.gfaces[fi];
       const tf = this.tfaces[fi];
 
-      if (gf.visible) {
+      if (gf.visibility > 0) {
         gfaces.push(gf);
         tfaces.push(tf);
       }
@@ -187,15 +187,15 @@ export class Mesh {
       const tq1 = tv2.scale(1 - t1).add(tv0.scale(t1));
 
       if (insideIndices.length === 1) {
-        gfaces.push(new Face(gv0, gq0, gq1, gf.normal));
+        gfaces.push(new Face(gv0, gq0, gq1, gf.visibility));
         tfaces.push(new Face(tv0, tq0, tq1));
 
         continue;
       }
 
       gfaces.push(
-        new Face(gv1, gv2, gq1, gf.normal),
-        new Face(gq1, gq0, gv1, gf.normal)
+        new Face(gv1, gv2, gq1, gf.visibility),
+        new Face(gq1, gq0, gv1, gf.visibility)
       );
 
       tfaces.push(new Face(tv1, tv2, tq1), new Face(tq1, tq0, tv1));

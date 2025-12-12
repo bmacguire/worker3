@@ -30,24 +30,17 @@ function addMotion(motions: Motion[], key: string) {
     return m.type === motion.type && m.axis === motion.axis;
   });
 
-  if (moving) {
-    return;
+  if (!moving) {
+    motions.unshift(motion);
   }
-
-  motions.unshift(motion);
 }
 
 export class Controller {
-  private readonly keys = new Set<string>();
+  keys = new Set<string>();
 
   constructor() {
-    addEventListener("keydown", (ev) => {
-      this.keys.add(ev.key);
-    });
-
-    addEventListener("keyup", (ev) => {
-      this.keys.delete(ev.key);
-    });
+    addEventListener("keydown", (ev) => this.keys.add(ev.key));
+    addEventListener("keyup", (ev) => this.keys.delete(ev.key));
   }
 
   getMotions() {

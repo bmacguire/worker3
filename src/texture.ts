@@ -1,9 +1,9 @@
 import { Pixel } from "./pixel";
 
 export class Texture {
-  readonly pixels: Pixel[][];
-  readonly width: number;
-  readonly height: number;
+  pixels: Pixel[][];
+  width: number;
+  height: number;
 
   constructor(imageData: ImageData) {
     const rows: Pixel[][] = [];

@@ -1,19 +1,38 @@
 import { Pixel } from "./pixel";
 
+const ZOOM = 2;
+
 export class Screen {
-  private readonly context: OffscreenCanvasRenderingContext2D;
-  private readonly imageData: ImageData;
-  private readonly depthBuffer: number[];
-  public readonly width: number;
-  public readonly height: number;
-  public readonly halfWidth: number;
-  public readonly halfHeight: number;
-  public readonly aspectRatio: number;
+  context: OffscreenCanvasRenderingContext2D;
+  bufferContext: OffscreenCanvasRenderingContext2D;
+  imageData: ImageData;
+  depthBuffer: number[];
+  width: number;
+  height: number;
+  halfWidth: number;
+  halfHeight: number;
+
+  // not used for now. it gets simplyfied when
+  // doing cals...
+  aspectRatio: number;
 
   constructor(canvas: OffscreenCanvas) {
     this.context = canvas.getContext("2d")!;
-    this.imageData = this.context.createImageData(canvas.width, canvas.height); // new ImageData(canvas.width, canvas.height);
-    this.depthBuffer = new Array(canvas.width * canvas.height).fill(0);
+    this.context.imageSmoothingEnabled = false;
+
+    this.bufferContext = new OffscreenCanvas(
+      canvas.width / ZOOM,
+      canvas.height / ZOOM
+    ).getContext("2d")!;
+
+    this.bufferContext.imageSmoothingEnabled = false;
+
+    this.imageData = new ImageData(canvas.width / ZOOM, canvas.height / ZOOM);
+
+    this.depthBuffer = new Array(
+      (canvas.width * canvas.height) / ZOOM ** 2
+    ).fill(0);
+
     this.width = this.imageData.width;
     this.height = this.imageData.height;
     this.halfWidth = this.width / 2;
@@ -33,7 +52,15 @@ export class Screen {
   }
 
   renderPixels() {
-    this.context.putImageData(this.imageData, 0, 0);
+    this.bufferContext.putImageData(this.imageData, 0, 0);
+
+    this.context.drawImage(
+      this.bufferContext.canvas,
+      0,
+      0,
+      this.context.canvas.width,
+      this.context.canvas.height
+    );
   }
 
   getPixelDepth(depthIndex: number) {

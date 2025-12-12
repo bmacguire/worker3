@@ -1,32 +1,38 @@
 import { Texture } from "./texture";
 import { Mesh } from "./mesh";
 import { Space } from "./space";
-//import { Vector } from "./vector";
-
-// RASTERIZE IS THE ONE FOR PERFORMANCE!!!
-// but also check others...
+import { Vector } from "./vector";
+import { Face } from "./face";
 
 async function init() {
   const canvas = document.querySelector("canvas")!.transferControlToOffscreen();
+  const space = new Space(canvas, Math.PI / 2, 0.1, 10_000);
 
-  const paperTexture = await Texture.build(
-    await (await fetch(`/textures/paper.jpg`)).blob()
+  const brickTexture = await Texture.build(
+    await (await fetch("/textures/brick.png")).blob()
   );
 
-  const rockTexture = await Texture.build(
-    await (await fetch(`/textures/rock.webp`)).blob()
+  const cubeBlob = await (await fetch(`/objs/cube.obj`)).blob();
+
+  const cubeMeshes = await Promise.all(
+    new Array(10).fill(0).map(async (_, i) => {
+      const mesh = await Mesh.build(cubeBlob, brickTexture);
+
+      const gfaces = mesh.gfaces.map((gf) => {
+        return new Face(
+          ...(gf.vertices.map((v) => v.add(new Vector(0, 0, i))) as [
+            Vector,
+            Vector,
+            Vector
+          ])
+        );
+      });
+
+      return new Mesh(gfaces, mesh.tfaces, mesh.texture);
+    })
   );
 
-  const space = new Space(canvas, Math.PI * 0.5, 0.1, 10000);
-
-  const teapotObj = await (await fetch(`/objs/teapot.obj`)).blob();
-  const teapotMesh = await Mesh.build(teapotObj, paperTexture);
-
-  const mountainsObj = await (await fetch(`/objs/mountains.obj`)).blob();
-  const mountainsMesh = await Mesh.build(mountainsObj, rockTexture);
-
-  const fpsElement = document.querySelector<HTMLDivElement>("#fps")!;
-  fpsElement.style.fontWeight = "bold";
+  const fpsDiv = document.querySelector<HTMLDivElement>("#fps")!;
 
   let time = 0;
   let bufferTime = 0;
@@ -38,8 +44,7 @@ async function init() {
     if (bufferTime > 300) {
       const fps = Math.round(1000 / deltaTime);
 
-      fpsElement.style.color = fps < 60 ? "red" : "green";
-      fpsElement.textContent = String(fps);
+      fpsDiv.textContent = String(fps);
 
       bufferTime = 0;
     }
@@ -47,7 +52,7 @@ async function init() {
     time = newTime;
 
     space.camera.update();
-    space.render(teapotMesh, mountainsMesh);
+    space.render(...cubeMeshes);
 
     requestAnimationFrame(loop);
   }

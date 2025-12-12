@@ -2,6 +2,7 @@ import { Mesh } from "./mesh";
 import { Screen } from "./screen";
 import { Vector } from "./vector";
 import { Face } from "./face";
+import { tan } from "./math";
 
 export class Projector {
   screen: Screen;
@@ -11,7 +12,7 @@ export class Projector {
 
   constructor(screen: Screen, fov: number, near: number, far: number) {
     this.screen = screen;
-    this.xyk = screen.halfHeight / Math.tan(fov * 0.5);
+    this.xyk = screen.halfHeight / tan(fov / 2);
     this.zk = far / (far - near);
     this.near = near;
   }
@@ -35,8 +36,11 @@ export class Projector {
           (gf.vertices[vi].y * this.xyk) / gf.vertices[vi].z +
             this.screen.halfHeight,
 
+          // not sure it's needed for now...
           0, //this.zk * (1 - this.near / gf.vertices[vi].z),
 
+          // not sure it's needed for now...
+          // save it for post calcs...
           gf.vertices[vi].z
         );
 
@@ -48,7 +52,7 @@ export class Projector {
       }
 
       gfaces.push(
-        new Face(gvertices[0], gvertices[1], gvertices[2], gf.normal)
+        new Face(gvertices[0], gvertices[1], gvertices[2], gf.visibility)
       );
 
       tfaces.push(new Face(tvertices[0], tvertices[1], tvertices[2]));

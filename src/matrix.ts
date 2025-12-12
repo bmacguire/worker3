@@ -13,6 +13,7 @@ export function buildRotation(u: Vector, angle: number): Matrix {
 
   const cc = 1 - c;
 
+  // refactor still. repeated ops
   const xycc = u.x * u.y * cc;
   const xzcc = u.x * u.z * cc;
   const yzcc = u.y * u.z * cc;

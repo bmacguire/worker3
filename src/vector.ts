@@ -14,15 +14,15 @@ export class Vector {
   }
 
   static i(k = 1) {
-    return new Vector(1, 0, 0).scale(k);
+    return new Vector(k, 0, 0);
   }
 
   static j(k = 1) {
-    return new Vector(0, 1, 0).scale(k);
+    return new Vector(0, k, 0);
   }
 
   static k(k = 1) {
-    return new Vector(0, 0, 1).scale(k);
+    return new Vector(0, 0, k);
   }
 
   add(v: Vector) {
