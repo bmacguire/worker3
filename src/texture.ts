@@ -1,9 +1,11 @@
-import { Pixel } from "./pixel";
+import { Pixel } from './pixel';
 
 export class Texture {
   pixels: Pixel[][];
   width: number;
   height: number;
+  widthMinus1: number;
+  heightMinus1: number;
 
   constructor(imageData: ImageData) {
     const rows: Pixel[][] = [];
@@ -29,17 +31,20 @@ export class Texture {
 
     this.width = imageData.width;
     this.height = imageData.height;
+
+    this.widthMinus1 = imageData.width - 1;
+    this.heightMinus1 = imageData.height - 1;
   }
 
   static async build(blob: Blob) {
     const image = new Image();
 
     return new Promise<Texture>((resolve) => {
-      image.addEventListener("load", () => {
+      image.addEventListener('load', () => {
         const context = new OffscreenCanvas(
           image.width,
-          image.height
-        ).getContext("2d")!;
+          image.height,
+        ).getContext('2d')!;
 
         context.drawImage(image, 0, 0);
 
@@ -47,7 +52,7 @@ export class Texture {
           0,
           0,
           context.canvas.width,
-          context.canvas.height
+          context.canvas.height,
         );
 
         URL.revokeObjectURL(image.src);
@@ -59,3 +64,7 @@ export class Texture {
     });
   }
 }
+
+export const TEXTURE_WHITE = new Texture(
+  new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1),
+);

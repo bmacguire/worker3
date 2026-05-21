@@ -1,4 +1,4 @@
-import { Vector } from "./vector";
+import { Vector } from './vector';
 
 export class Face {
   vertices: [Vector, Vector, Vector];
@@ -15,8 +15,11 @@ export class Face {
         .sub(this.vertices[0])
         .cross(this.vertices[2].sub(this.vertices[0]));
 
+      // this._visibility =
+      //   -255 * normal.normalize().dot(this.vertices[0].normalize());
+
       this._visibility =
-        -255 * normal.normalize().dot(this.vertices[0].normalize());
+        -1 * normal.normalize().dot(this.vertices[0].normalize());
     }
 
     return this._visibility;

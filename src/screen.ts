@@ -1,6 +1,6 @@
-import { Pixel } from "./pixel";
+import { Pixel } from './pixel';
 
-const ZOOM = 2;
+const ZOOM = 1;
 
 export class Screen {
   context: OffscreenCanvasRenderingContext2D;
@@ -17,20 +17,20 @@ export class Screen {
   aspectRatio: number;
 
   constructor(canvas: OffscreenCanvas) {
-    this.context = canvas.getContext("2d")!;
+    this.context = canvas.getContext('2d')!;
     this.context.imageSmoothingEnabled = false;
 
     this.bufferContext = new OffscreenCanvas(
       canvas.width / ZOOM,
-      canvas.height / ZOOM
-    ).getContext("2d")!;
+      canvas.height / ZOOM,
+    ).getContext('2d')!;
 
     this.bufferContext.imageSmoothingEnabled = false;
 
     this.imageData = new ImageData(canvas.width / ZOOM, canvas.height / ZOOM);
 
     this.depthBuffer = new Array(
-      (canvas.width * canvas.height) / ZOOM ** 2
+      (canvas.width * canvas.height) / ZOOM ** 2,
     ).fill(0);
 
     this.width = this.imageData.width;
@@ -59,7 +59,7 @@ export class Screen {
       0,
       0,
       this.context.canvas.width,
-      this.context.canvas.height
+      this.context.canvas.height,
     );
   }
 
